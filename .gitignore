@@ -1,0 +1,19 @@
+# Compiled binaries
+pool_ball_project
+test_opencv
+*.o
+*.out
+
+# Build directories
+build/
+cmake-build-*/
+
+# IDE files
+.vscode/
+.idea/
+
+# Temporary outputs
+outputs/
+
+# Generated files
+*.log
