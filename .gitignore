@@ -8,6 +8,16 @@ test_opencv
 build/
 cmake-build-*/
 
+# Assignment dataset (not to be uploaded)
+data/
+
+# Generated output
+results/
+
+# Compiled binary
+pool_detector
+*.o
+
 # IDE files
 .vscode/
 .idea/
