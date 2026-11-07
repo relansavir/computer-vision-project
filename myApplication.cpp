@@ -174,13 +174,17 @@ vector<Point2f> findBallCentres(const vector<vector<Point>>& ballContours,
 
 void MyApplication()
 {
-    Mat image = imread("results/Table2_transformed.jpeg");
-    if (image.empty())
+        for (int t = 1; t <= 6; t++)
     {
-        cout << "Image not found!" << endl;
-        return;
+    string filename = "data/Table" + to_string(t) + ".jpeg";
+    Mat original = imread(filename);
+    if (original.empty())
+    {
+        cout << "Could not load " << filename << endl;
+        continue;
     }
- 
+    Mat image = transformImage(original);
+    cout << "Table " << t << ":" << endl;
     Mat greenMask = createGreenMask(image);
     Mat cushionMask = createCushionMask(image);
     Mat backgroundMask;
@@ -200,9 +204,12 @@ void MyApplication()
         cout << "  Ball " << i + 1 << ": column " << (int)ballCentres[i].x
              << ", row " << (int)ballCentres[i].y << endl;
     }
-    imshow("Original", image);
-    imshow("Green Mask", greenMask);
-    imshow("Detected Regions", result);
+    
+    string prefix = "results/detection/Table" + to_string(t);
+    imwrite(prefix + "_1_transformed.jpeg", image);
+    imwrite(prefix + "_2_background_mask.png", backgroundMask);
+    imwrite(prefix + "_3_detections.jpeg", result);
+    }
  
     waitKey(0);
     destroyAllWindows();
