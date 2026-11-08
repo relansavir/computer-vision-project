@@ -3,6 +3,7 @@
 #include <iomanip>
 #include <algorithm>
 #include <tuple>
+#include <cmath>
 
 using namespace cv;
 using namespace std;
@@ -175,6 +176,138 @@ vector<Point2f> findBallCentres(const vector<vector<Point>>& ballContours,
     return centres;
 }
 
+
+const int ALLBALLS_GT[16][2] = {
+    {253, 908}, {250, 959}, {255, 1013}, {256, 1072}, {254, 1132}, {262, 1184},
+    {256, 1244}, {253, 1307}, {329, 901}, {330, 961}, {335, 1013}, {336, 1067},
+    {334, 1130}, {345, 1187}, {342, 1245}, {293, 797}
+};
+
+const int WHITE_LIGHTNESS = 160;
+const double WHITE_BALL_FRACTION = 0.88;
+const double APPEARANCE_PENALTY = 0.3;
+
+struct BallDescription
+{
+    Mat histogram;
+    double whiteFraction = 0.0;
+};
+
+BallDescription describeBall(const Mat& hls, const Mat& feltMask, Point2f centre)
+{
+    Mat region = Mat::zeros(hls.size(), CV_8UC1);
+    ellipse(region, Point(cvRound(centre.x), cvRound(centre.y)), Size(20, 30),
+            0, 0, 360, Scalar(255), FILLED);
+    Mat notFelt;
+    bitwise_not(feltMask, notFelt);
+    bitwise_and(region, notFelt, region);
+
+    BallDescription d;
+
+    int channels[] = { 0, 1, 2 };
+    int histSize[] = { 12, 4, 4 };
+    float hueRange[] = { 0, 180 };
+    float otherRange[] = { 0, 256 };
+    const float* ranges[] = { hueRange, otherRange, otherRange };
+    calcHist(&hls, 1, channels, region, d.histogram, 3, histSize, ranges);
+    normalize(d.histogram, d.histogram, 1.0, 0.0, NORM_L1);
+
+    Mat lightness;
+    extractChannel(hls, lightness, 1);
+    Mat whitePixels = (lightness > WHITE_LIGHTNESS) & region;
+    int total = countNonZero(region);
+    d.whiteFraction = (total > 0) ? countNonZero(whitePixels) / (double)total : 0.0;
+
+    return d;
+}
+
+struct BallModel
+{
+    vector<BallDescription> reference;
+    double stripeThreshold = 0.0;
+};
+
+BallModel trainBallModel()
+{
+    BallModel model;
+    Mat image = transformImage(imread("data/AllBalls.jpeg"));
+    Mat hls;
+    cvtColor(image, hls, COLOR_BGR2HLS);
+    Mat feltMask = createGreenMask(image);
+
+    for (int b = 0; b < 16; b++)
+    {
+        Point2f centre((float)ALLBALLS_GT[b][1], (float)ALLBALLS_GT[b][0]);
+        model.reference.push_back(describeBall(hls, feltMask, centre));
+    }
+
+    double maxSolid = 0.0, minStripe = 1.0;
+    for (int b = 0; b < 8; b++)
+    {
+        maxSolid = max(maxSolid, model.reference[b].whiteFraction);
+    }
+    for (int b = 8; b < 15; b++)
+    {
+        minStripe = min(minStripe, model.reference[b].whiteFraction);
+    }
+    model.stripeThreshold = sqrt(maxSolid * minStripe);
+
+    cout << "Stripe threshold (from AllBalls): " << model.stripeThreshold << endl;
+    return model;
+}
+
+double labelCost(const BallDescription& ball, int b, const BallModel& model)
+{
+    double cost = compareHist(ball.histogram, model.reference[b].histogram,
+                              HISTCMP_BHATTACHARYYA);
+
+    bool looksWhite = ball.whiteFraction > WHITE_BALL_FRACTION;
+    bool looksStripe = ball.whiteFraction > model.stripeThreshold;
+    if (b == 15)
+    {
+        if (!looksWhite) cost += APPEARANCE_PENALTY;
+    }
+    else
+    {
+        if (looksWhite) cost += APPEARANCE_PENALTY;
+        if (looksStripe != (b >= 8)) cost += APPEARANCE_PENALTY;
+    }
+    return cost;
+}
+
+vector<int> assignBallLabels(const vector<BallDescription>& balls, const BallModel& model)
+{
+    vector<tuple<double, int, int>> options;
+    for (size_t i = 0; i < balls.size(); i++)
+    {
+        for (int b = 0; b < 16; b++)
+        {
+            options.push_back(make_tuple(labelCost(balls[i], b, model), (int)i, b));
+        }
+    }
+    sort(options.begin(), options.end());
+
+    vector<int> labels(balls.size(), -1);
+    vector<bool> numberUsed(16, false);
+    for (size_t o = 0; o < options.size(); o++)
+    {
+        int i = get<1>(options[o]);
+        int b = get<2>(options[o]);
+        if (labels[i] == -1 && !numberUsed[b])
+        {
+            labels[i] = b;
+            numberUsed[b] = true;
+        }
+    }
+    return labels;
+}
+
+string ballName(int index)
+{
+    if (index < 0) return "?";
+    return (index == 15) ? "W" : to_string(index + 1);
+}
+
 const int GROUND_TRUTH[6][16][2] = {
     { {309, 1092}, {429, 1212}, {383, 1131}, {335, 1050}, {285, 1211}, {261, 1170}, {352, 1173}, {331, 1132}, {240, 1210}, {310, 1170}, {407, 1169}, {281, 1135}, {374, 1212}, {360, 1091}, {331, 1213}, {288, 29} },
     { {282, 1103}, {620, 1224}, {391, 1121}, {315, 1046}, {310, 1305}, {202, 621}, {361, 1173}, {331, 1132}, {177, 725}, {185, 1269}, {665, 798}, {296, 438}, {53, 1235}, {362, 1090}, {399, 1205}, {507, 1169} },
@@ -191,12 +324,14 @@ struct DetectionScore
     int truePositives = 0;
     int falsePositives = 0;
     int falseNegatives = 0;
-    double totalError = 0.0;   
+    double totalError = 0.0;  
+    vector<pair<int, int>> matches; 
 };
 
 DetectionScore evaluateDetection(const vector<Point2f>& detections, int tableIndex)
 {
     vector<Point2f> truth;
+    vector<int> truthId;
     for (int b = 0; b < 16; b++)
     {
         int row = GROUND_TRUTH[tableIndex][b][0];
@@ -204,6 +339,7 @@ DetectionScore evaluateDetection(const vector<Point2f>& detections, int tableInd
         if (row >= 0)
         {
             truth.push_back(Point2f((float)col, (float)row));
+            truthId.push_back(b);
         }
     }
 
@@ -241,6 +377,7 @@ DetectionScore evaluateDetection(const vector<Point2f>& detections, int tableInd
         truthUsed[g] = true;
         score.truePositives++;
         score.totalError += distance;
+        score.matches.push_back(make_pair(d, truthId[g]));
     }
 
     score.falsePositives = (int)detections.size() - score.truePositives;
@@ -265,7 +402,10 @@ void printScore(const string& label, const DetectionScore& s)
 }
 
 void MyApplication()
-{
+{   
+    BallModel model = trainBallModel();
+    int confusion[16][16] = { 0 };   // [true ball][predicted ball]
+    int unlabelled = 0;
     DetectionScore total;
     for (int t = 1; t <= 6; t++)
     {
@@ -295,6 +435,35 @@ void MyApplication()
     total.falsePositives += score.falsePositives;
     total.falseNegatives += score.falseNegatives;
     total.totalError += score.totalError;
+
+            // Recognise each detected ball
+    Mat hls;
+    cvtColor(image, hls, COLOR_BGR2HLS);
+    vector<BallDescription> balls;
+    for (size_t i = 0; i < ballCentres.size(); i++)
+    {
+        balls.push_back(describeBall(hls, greenMask, ballCentres[i]));
+    }
+    vector<int> labels = assignBallLabels(balls, model);
+
+    for (size_t i = 0; i < ballCentres.size(); i++)
+    {
+        putText(result, ballName(labels[i]),
+                Point((int)ballCentres[i].x + 15, (int)ballCentres[i].y - 15),
+                FONT_HERSHEY_SIMPLEX, 0.9, Scalar(255, 255, 255), 2);
+    }
+
+        // Compare with the true identity of every correctly detected ball
+    for (size_t m = 0; m < score.matches.size(); m++){
+            int trueBall = score.matches[m].second;
+            int predicted = labels[score.matches[m].first];
+            if (predicted < 0)
+            {
+                unlabelled++;
+                continue;
+            }
+            confusion[trueBall][predicted]++;
+    }
     
     cout << "Balls found: " << ballCentres.size() << endl;
 
@@ -312,6 +481,30 @@ void MyApplication()
     imwrite(prefix + "_3_detections.jpeg", result);
     }
     printScore("OVERALL", total);
+    // Recognition results
+    int correct = 0, evaluated = unlabelled;
+    for (int i = 0; i < 16; i++)
+    {
+        for (int j = 0; j < 16; j++)
+        {
+            evaluated += confusion[i][j];
+        }
+        correct += confusion[i][i];
+    }
+    cout << "\nRECOGNITION  correct=" << correct << " of " << evaluated
+         << " detected balls  accuracy=" << fixed << setprecision(3)
+         << correct / (double)evaluated << endl;
+    cout.unsetf(ios::fixed);
+
+    cout << "\nConfusion matrix (rows = true ball, columns = predicted)\n    ";
+    for (int j = 0; j < 16; j++) cout << setw(3) << ballName(j);
+    cout << endl;
+    for (int i = 0; i < 16; i++)
+    {
+        cout << setw(3) << ballName(i) << " ";
+        for (int j = 0; j < 16; j++) cout << setw(3) << confusion[i][j];
+        cout << endl;
+    }
 }
 
 int main()
