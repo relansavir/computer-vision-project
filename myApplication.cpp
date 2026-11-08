@@ -1,5 +1,8 @@
 #include <opencv2/opencv.hpp>
 #include <iostream>
+#include <iomanip>
+#include <algorithm>
+#include <tuple>
 
 using namespace cv;
 using namespace std;
@@ -172,9 +175,99 @@ vector<Point2f> findBallCentres(const vector<vector<Point>>& ballContours,
     return centres;
 }
 
+const int GROUND_TRUTH[6][16][2] = {
+    { {309, 1092}, {429, 1212}, {383, 1131}, {335, 1050}, {285, 1211}, {261, 1170}, {352, 1173}, {331, 1132}, {240, 1210}, {310, 1170}, {407, 1169}, {281, 1135}, {374, 1212}, {360, 1091}, {331, 1213}, {288, 29} },
+    { {282, 1103}, {620, 1224}, {391, 1121}, {315, 1046}, {310, 1305}, {202, 621}, {361, 1173}, {331, 1132}, {177, 725}, {185, 1269}, {665, 798}, {296, 438}, {53, 1235}, {362, 1090}, {399, 1205}, {507, 1169} },
+    { {23, 908}, {616, 1224}, {447, 1199}, {336, 29}, {305, 1406}, {210, 621}, {260, 1294}, {226, 1252}, {177, 725}, {171, 1270}, {665, 798}, {249, 351}, {53, 1233}, {169, 901}, {399, 1201}, {434, 29} },
+    { {23, 908}, {546, 1407}, {444, 1204}, {-1, -1}, {305, 1406}, {210, 621}, {260, 1294}, {226, 1252}, {181, 724}, {171, 1270}, {665, 798}, {249, 351}, {58, 1231}, {169, 901}, {399, 1201}, {88, 1392} },
+    { {535, 23}, {546, 1407}, {444, 1204}, {-1, -1}, {305, 1406}, {131, 25}, {260, 1294}, {226, 1252}, {538, 72}, {171, 1270}, {665, 798}, {249, 351}, {-1, -1}, {169, 901}, {399, 1201}, {608, 26} },
+    { {535, 23}, {477, 1364}, {444, 1204}, {-1, -1}, {305, 1406}, {131, 25}, {260, 1294}, {226, 1252}, {538, 72}, {171, 1270}, {-1, -1}, {249, 351}, {-1, -1}, {169, 901}, {399, 1201}, {629, 947} }
+};
+
+const double MATCH_DISTANCE = 21.5;
+
+struct DetectionScore
+{
+    int truePositives = 0;
+    int falsePositives = 0;
+    int falseNegatives = 0;
+    double totalError = 0.0;   
+};
+
+DetectionScore evaluateDetection(const vector<Point2f>& detections, int tableIndex)
+{
+    vector<Point2f> truth;
+    for (int b = 0; b < 16; b++)
+    {
+        int row = GROUND_TRUTH[tableIndex][b][0];
+        int col = GROUND_TRUTH[tableIndex][b][1];
+        if (row >= 0)
+        {
+            truth.push_back(Point2f((float)col, (float)row));
+        }
+    }
+
+    // Every possible (detection, truth) pair, sorted by distance
+    vector<tuple<double, int, int>> pairs;
+    for (size_t d = 0; d < detections.size(); d++)
+    {
+        for (size_t g = 0; g < truth.size(); g++)
+        {
+            pairs.push_back(make_tuple(norm(detections[d] - truth[g]), (int)d, (int)g));
+        }
+    }
+    sort(pairs.begin(), pairs.end());
+
+    vector<bool> detectionUsed(detections.size(), false);
+    vector<bool> truthUsed(truth.size(), false);
+    DetectionScore score;
+
+    for (size_t p = 0; p < pairs.size(); p++)
+    {
+        double distance = get<0>(pairs[p]);
+        int d = get<1>(pairs[p]);
+        int g = get<2>(pairs[p]);
+
+        if (distance > MATCH_DISTANCE)
+        {
+            break;
+        }
+        if (detectionUsed[d] || truthUsed[g])
+        {
+            continue;
+        }
+
+        detectionUsed[d] = true;
+        truthUsed[g] = true;
+        score.truePositives++;
+        score.totalError += distance;
+    }
+
+    score.falsePositives = (int)detections.size() - score.truePositives;
+    score.falseNegatives = (int)truth.size() - score.truePositives;
+    return score;
+}
+
+ 
+void printScore(const string& label, const DetectionScore& s)
+{
+    double precision = s.truePositives / (double)(s.truePositives + s.falsePositives);
+    double recall = s.truePositives / (double)(s.truePositives + s.falseNegatives);
+    double f1 = 2 * precision * recall / (precision + recall);
+    double meanError = s.truePositives > 0 ? s.totalError / s.truePositives : 0.0;
+ 
+    cout << label << "  TP=" << s.truePositives << " FP=" << s.falsePositives
+         << " FN=" << s.falseNegatives << fixed << setprecision(3)
+         << "  Precision=" << precision << " Recall=" << recall
+         << " F1=" << f1 << setprecision(1)
+         << "  Mean error=" << meanError << " mm" << endl;
+    cout.unsetf(ios::fixed);
+}
+
 void MyApplication()
 {
-        for (int t = 1; t <= 6; t++)
+    DetectionScore total;
+    for (int t = 1; t <= 6; t++)
     {
     string filename = "data/Table" + to_string(t) + ".jpeg";
     Mat original = imread(filename);
@@ -195,6 +288,14 @@ void MyApplication()
     Mat result = image.clone();
     drawContours(result, ballContours, -1, Scalar(0, 0, 255), 3);
     vector<Point2f> ballCentres = findBallCentres(ballContours, image.size());
+    DetectionScore score = evaluateDetection(ballCentres, t - 1);
+    printScore("Table " + to_string(t), score);
+
+    total.truePositives += score.truePositives;
+    total.falsePositives += score.falsePositives;
+    total.falseNegatives += score.falseNegatives;
+    total.totalError += score.totalError;
+    
     cout << "Balls found: " << ballCentres.size() << endl;
 
     for (size_t i = 0; i < ballCentres.size(); i++)
@@ -204,15 +305,13 @@ void MyApplication()
         cout << "  Ball " << i + 1 << ": column " << (int)ballCentres[i].x
              << ", row " << (int)ballCentres[i].y << endl;
     }
-    
+
     string prefix = "results/detection/Table" + to_string(t);
     imwrite(prefix + "_1_transformed.jpeg", image);
     imwrite(prefix + "_2_background_mask.png", backgroundMask);
     imwrite(prefix + "_3_detections.jpeg", result);
     }
- 
-    waitKey(0);
-    destroyAllWindows();
+    printScore("OVERALL", total);
 }
 
 int main()
