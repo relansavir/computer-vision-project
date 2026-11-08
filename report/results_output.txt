@@ -1,0 +1,135 @@
+Stripe threshold (from AllBalls): 0.244934
+Table 1:
+Regions found: 2
+Table 1  TP=11 FP=3 FN=5  Precision=0.786 Recall=0.688 F1=0.733  Mean error=11.2 mm
+Balls found: 14
+  Ball 1: column 28, row 284
+  Ball 2: column 1211, row 241
+  Ball 3: column 1127, row 384
+  Ball 4: column 1212, row 385
+  Ball 5: column 1124, row 265
+  Ball 6: column 1075, row 303
+  Ball 7: column 1165, row 333
+  Ball 8: column 1198, row 452
+  Ball 9: column 1116, row 327
+  Ball 10: column 1209, row 311
+  Ball 11: column 1167, row 408
+  Ball 12: column 1045, row 360
+  Ball 13: column 1082, row 386
+  Ball 14: column 1165, row 256
+Table 2:
+Regions found: 10
+Table 2  TP=14 FP=2 FN=2  Precision=0.875 Recall=0.875 F1=0.875  Mean error=6.3 mm
+Balls found: 16
+  Ball 1: column 793, row 658
+  Ball 2: column 1226, row 618
+  Ball 3: column 1170, row 503
+  Ball 4: column 1305, row 308
+  Ball 5: column 441, row 307
+  Ball 6: column 1045, row 331
+  Ball 7: column 1204, row 394
+  Ball 8: column 1093, row 278
+  Ball 9: column 1123, row 318
+  Ball 10: column 1123, row 391
+  Ball 11: column 1170, row 359
+  Ball 12: column 1080, row 386
+  Ball 13: column 624, row 229
+  Ball 14: column 1266, row 189
+  Ball 15: column 724, row 175
+  Ball 16: column 1234, row 52
+Table 3:
+Regions found: 14
+Table 3  TP=15 FP=1 FN=1  Precision=0.938 Recall=0.938 F1=0.938  Mean error=6.6 mm
+Balls found: 16
+  Ball 1: column 793, row 658
+  Ball 2: column 1225, row 618
+  Ball 3: column 31, row 431
+  Ball 4: column 1199, row 449
+  Ball 5: column 1206, row 393
+  Ball 6: column 30, row 336
+  Ball 7: column 1405, row 301
+  Ball 8: column 1293, row 256
+  Ball 9: column 356, row 258
+  Ball 10: column 624, row 229
+  Ball 11: column 904, row 191
+  Ball 12: column 1248, row 244
+  Ball 13: column 1273, row 174
+  Ball 14: column 723, row 175
+  Ball 15: column 1233, row 52
+  Ball 16: column 905, row 31
+Table 4:
+Regions found: 12
+Table 4  TP=12 FP=5 FN=3  Precision=0.706 Recall=0.800 F1=0.750  Mean error=6.3 mm
+Balls found: 17
+  Ball 1: column 793, row 658
+  Ball 2: column 1406, row 546
+  Ball 3: column 1199, row 448
+  Ball 4: column 1206, row 393
+  Ball 5: column 1406, row 302
+  Ball 6: column 372, row 290
+  Ball 7: column 348, row 242
+  Ball 8: column 624, row 233
+  Ball 9: column 901, row 196
+  Ball 10: column 1247, row 253
+  Ball 11: column 1288, row 255
+  Ball 12: column 1272, row 176
+  Ball 13: column 722, row 174
+  Ball 14: column 1233, row 51
+  Ball 15: column 1409, row 36
+  Ball 16: column 1385, row 92
+  Ball 17: column 904, row 30
+Table 5:
+Regions found: 8
+Table 5  TP=12 FP=0 FN=2  Precision=1.000 Recall=0.857 F1=0.923  Mean error=8.7 mm
+Balls found: 12
+  Ball 1: column 790, row 657
+  Ball 2: column 1404, row 544
+  Ball 3: column 25, row 536
+  Ball 4: column 27, row 605
+  Ball 5: column 70, row 518
+  Ball 6: column 1197, row 446
+  Ball 7: column 1205, row 390
+  Ball 8: column 1405, row 299
+  Ball 9: column 351, row 250
+  Ball 10: column 903, row 188
+  Ball 11: column 1268, row 178
+  Ball 12: column 1285, row 245
+Table 6:
+Regions found: 8
+Table 6  TP=11 FP=2 FN=2  Precision=0.846 Recall=0.846 F1=0.846  Mean error=6.8 mm
+Balls found: 13
+  Ball 1: column 945, row 629
+  Ball 2: column 67, row 492
+  Ball 3: column 26, row 535
+  Ball 4: column 78, row 538
+  Ball 5: column 1360, row 480
+  Ball 6: column 1198, row 446
+  Ball 7: column 1205, row 391
+  Ball 8: column 1405, row 300
+  Ball 9: column 352, row 252
+  Ball 10: column 902, row 186
+  Ball 11: column 1290, row 246
+  Ball 12: column 1250, row 254
+  Ball 13: column 1271, row 174
+OVERALL  TP=75 FP=13 FN=15  Precision=0.852 Recall=0.833 F1=0.843  Mean error=7.6 mm
+
+RECOGNITION  correct=67 of 75 detected balls  accuracy=0.893
+
+Confusion matrix (rows = true ball, columns = predicted)
+      1  2  3  4  5  6  7  8  9 10 11 12 13 14 15  W
+  1   5  0  0  0  1  0  0  0  0  0  0  0  0  0  0  0
+  2   0  5  0  0  0  0  0  0  0  0  0  0  0  0  0  0
+  3   0  0  6  0  0  0  0  0  0  0  0  0  0  0  0  0
+  4   0  0  0  2  0  0  0  0  0  0  0  0  0  0  0  0
+  5   0  0  0  0  5  0  0  0  0  0  0  0  0  0  0  0
+  6   0  0  0  0  0  1  0  0  0  0  0  0  0  1  0  0
+  7   0  0  0  0  0  0  6  0  0  0  0  0  0  0  0  0
+  8   0  0  0  0  0  0  0  3  0  0  0  0  0  0  0  0
+  9   1  0  0  0  0  0  0  0  5  0  0  0  0  0  0  0
+ 10   0  0  0  0  0  0  0  0  0  5  0  0  0  0  0  0
+ 11   0  0  0  0  0  0  0  0  0  0  5  0  0  0  0  0
+ 12   0  0  0  0  0  0  0  0  1  0  0  4  0  1  0  0
+ 13   0  0  0  0  0  0  0  0  0  0  0  0  4  0  0  0
+ 14   0  0  0  0  0  2  0  0  0  0  0  0  0  0  0  0
+ 15   0  0  0  0  0  0  0  0  0  0  0  0  0  0  6  0
+  W   0  0  0  0  0  0  0  0  0  0  0  0  0  1  0  5
