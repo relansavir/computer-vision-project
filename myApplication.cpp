@@ -49,11 +49,46 @@ Mat createGreenMask(const Mat& image)
     Mat hls;
     cvtColor(image, hls, COLOR_BGR2HLS);
 
-    Mat greenMask;
-    Scalar lowerGreen(46, 25, 4);
-    Scalar upperGreen(70, 255, 94);
+    int channels[] = { 0, 2 };
+    int histSize[] = { 180, 256 };
+    float hueRange[] = { 0, 180 };
+    float satRange[] = { 0, 256 };
+    const float* ranges[] = { hueRange, satRange };
+    Mat histogram;
+    calcHist(&hls, 1, channels, Mat(), histogram, 2, histSize, ranges);
+    GaussianBlur(histogram, histogram, Size(5, 5), 0);
 
-    inRange(hls, lowerGreen, upperGreen, greenMask);
+    Point peak;
+    minMaxLoc(histogram, nullptr, nullptr, nullptr, &peak);
+    int feltHue = peak.y;
+    int feltSat = peak.x;
+
+    Mat lightness;
+    extractChannel(hls, lightness, 1);
+    vector<uchar> values(lightness.begin<uchar>(), lightness.end<uchar>());
+    nth_element(values.begin(), values.begin() + values.size() / 2, values.end());
+    int feltLight = values[values.size() / 2];
+
+    Mat distance(hls.size(), CV_8UC1);
+    for (int y = 0; y < hls.rows; y++)
+    {
+        for (int x = 0; x < hls.cols; x++)
+        {
+            Vec3b p = hls.at<Vec3b>(y, x);
+            int dh = abs(p[0] - feltHue);
+            dh = min(dh, 180 - dh);
+            int ds = p[2] - feltSat;
+            int dl = max(feltLight - (int)p[1], 0);
+            double d = sqrt((3.0 * dh) * (3.0 * dh) + (double)(ds * ds) + (1.5 * dl) * (1.5 * dl));            
+            distance.at<uchar>(y, x) = (uchar)min(d, 255.0);
+        }
+    }
+
+    Mat greenMask;
+    double otsuThreshold = threshold(distance, greenMask, 0, 255, THRESH_BINARY_INV | THRESH_OTSU);
+
+
+    cout << "Felt hue " << feltHue << ", saturation " << feltSat<< ", lightness " << feltLight << ", Otsu threshold " << (int)otsuThreshold << endl;
 
     return greenMask;
 }
