@@ -4,11 +4,11 @@
 #include <algorithm>
 #include <tuple>
 #include <cmath>
-
+// Include the libraries needed for image processing and basic C++ operations.
 using namespace cv;
 using namespace std;
 
-
+// Transforms the pool table image into a straight rectangular view.
 Mat transformImage(const Mat& image)
 {
     // 1. Define the four corners in the original image
@@ -19,7 +19,7 @@ Mat transformImage(const Mat& image)
         Point2f(38, 472)     // Bottom-left
     };
  
-    // 2. Define the corresponding rectangular destination
+    // Define where the four corners should appear in the transformed image.
     Point2f dstPoints[4] = {
         Point2f(0, 0),
         Point2f(1433, 0),
@@ -40,61 +40,99 @@ Mat transformImage(const Mat& image)
         transformationMatrix,
         Size(1434, 683)
     );
- 
+    // Return the transformed image.
     return transformedImage;
 }
 
+// Identifies the green pool table felt and creates a binary mask.
 Mat createGreenMask(const Mat& image)
 {
+    // Convert the image from RGB to HLS to make colour segmentation easier.
     Mat hls;
     cvtColor(image, hls, COLOR_BGR2HLS);
 
+    // Set up a histogram using hue and saturation to find the most common felt colour.
     int channels[] = { 0, 2 };
     int histSize[] = { 180, 256 };
     float hueRange[] = { 0, 180 };
     float satRange[] = { 0, 256 };
     const float* ranges[] = { hueRange, satRange };
+
     Mat histogram;
+
+    // Calculate the hue and saturation histogram and smooth it to reduce noise.
     calcHist(&hls, 1, channels, Mat(), histogram, 2, histSize, ranges);
     GaussianBlur(histogram, histogram, Size(5, 5), 0);
 
+    // Find the most common hue and saturation values in the histogram.
     Point peak;
     minMaxLoc(histogram, nullptr, nullptr, nullptr, &peak);
     int feltHue = peak.y;
     int feltSat = peak.x;
 
     Mat lightness;
+
+    // Extract the lightness channel and calculate its median value.
     extractChannel(hls, lightness, 1);
     vector<uchar> values(lightness.begin<uchar>(), lightness.end<uchar>());
     nth_element(values.begin(), values.begin() + values.size() / 2, values.end());
     int feltLight = values[values.size() / 2];
 
+    // Create an image to store how different each pixel is from the estimated felt colour.
     Mat distance(hls.size(), CV_8UC1);
+
     for (int y = 0; y < hls.rows; y++)
     {
         for (int x = 0; x < hls.cols; x++)
         {
+            // Read the HLS colour values of the current pixel.
             Vec3b p = hls.at<Vec3b>(y, x);
+
+            // Calculate the difference between the pixel hue and the felt hue.
             int dh = abs(p[0] - feltHue);
             dh = min(dh, 180 - dh);
+
+            // Calculate the difference in saturation.
             int ds = p[2] - feltSat;
+
+            // Measure how much darker the pixel is compared to the felt.
             int dl = max(feltLight - (int)p[1], 0);
-            double d = sqrt((3.0 * dh) * (3.0 * dh) + (double)(ds * ds) + (1.5 * dl) * (1.5 * dl));            
+
+            // Combine the colour differences into one distance value.
+            double d = sqrt((3.0 * dh) * (3.0 * dh) +
+                            (double)(ds * ds) +
+                            (1.5 * dl) * (1.5 * dl));
+
             distance.at<uchar>(y, x) = (uchar)min(d, 255.0);
         }
     }
 
+    // Use Otsu thresholding to separate pixels that look like felt from the rest.
     Mat greenMask;
-    double otsuThreshold = threshold(distance, greenMask, 0, 255, THRESH_BINARY_INV | THRESH_OTSU);
-    cout << "Felt hue " << feltHue << ", saturation " << feltSat<< ", lightness " << feltLight << ", Otsu threshold " << (int)otsuThreshold << endl;
+    double otsuThreshold = threshold(
+        distance, greenMask, 0, 255,
+        THRESH_BINARY_INV | THRESH_OTSU
+    );
+
+    // Print the estimated felt colour and the threshold selected by Otsu.
+    cout << "Felt hue " << feltHue
+         << ", saturation " << feltSat
+         << ", lightness " << feltLight
+         << ", Otsu threshold " << (int)otsuThreshold << endl;
+
+    // Remove very dark pixels from the felt mask.
     greenMask.setTo(0, lightness < 25);
+
+    // Return the final binary felt mask.
     return greenMask;
 }
 
+// Creates a mask to identify the table cushions.
 Mat createCushionMask(const Mat& image)
 {
     Mat hls;
     cvtColor(image, hls, COLOR_BGR2HLS);
+    // Select pixels within the HLS colour range of the cushions.
     Mat cushionColour;
     inRange(hls, Scalar(38, 25, 20), Scalar(85, 190, 255), cushionColour);
 
@@ -110,6 +148,7 @@ Mat createCushionMask(const Mat& image)
     return cushionMask;
 }
 
+// Checks whether a point is close to a pocket.
 bool isNearPocket(Point2f centre)
 {
     Point2f pockets[6] = {
@@ -127,38 +166,49 @@ bool isNearPocket(Point2f centre)
     return false;
 }
 
+// Finds contours that could represent pool balls.
 vector<vector<Point>> findBallContours(const Mat& greenMask)
 {
+    // Invert the felt mask so that potential balls become white.
     Mat ballMask;
     bitwise_not(greenMask, ballMask);
+
+    // Remove small noise using morphological opening.
     Mat kernel = getStructuringElement(MORPH_ELLIPSE, Size(9, 9));
     morphologyEx(ballMask, ballMask, MORPH_OPEN, kernel);
- 
+
+    // Find the outer contours of the remaining regions.
     vector<vector<Point>> contours;
     findContours(ballMask, contours, RETR_EXTERNAL, CHAIN_APPROX_SIMPLE);
- 
+
     vector<vector<Point>> ballContours;
+
     for (size_t i = 0; i < contours.size(); i++)
     {
+        // Ignore regions that are too small to be balls.
         if (contourArea(contours[i]) < 1000)
         {
             continue;
         }
- 
+
+        // Calculate the centre of each contour.
         Moments m = moments(contours[i]);
         Point2f centre(m.m10 / m.m00, m.m01 / m.m00);
- 
+
+        // Ignore regions that are too close to a pocket.
         if (isNearPocket(centre))
         {
             continue;
         }
- 
+
+        cout << "  Region area " << (int)contourArea(contours[i]) << endl;
         ballContours.push_back(contours[i]);
     }
- 
+
     return ballContours;
 }
 
+// Finds the centre coordinates of the detected balls.
 vector<Point2f> findBallCentres(const vector<vector<Point>>& ballContours,
                                 Size imageSize)
 {
@@ -169,9 +219,11 @@ vector<Point2f> findBallCentres(const vector<vector<Point>>& ballContours,
 
     for (size_t i = 0; i < ballContours.size(); i++)
     {
+        // Estimate how many balls are present based on the contour area.
         double area = contourArea(ballContours[i]);
         int numBalls = max(1, (int)round(area / SINGLE_BALL_AREA));
 
+        // If there is only one ball, calculate its centre using image moments.
         if (numBalls == 1)
         {
             Moments m = moments(ballContours[i]);
@@ -179,12 +231,14 @@ vector<Point2f> findBallCentres(const vector<vector<Point>>& ballContours,
             continue;
         }
 
+        // Create a mask containing the pixels inside the detected region.
         Mat regionMask = Mat::zeros(imageSize, CV_8UC1);
         drawContours(regionMask, ballContours, (int)i, Scalar(255), FILLED);
 
         vector<Point> pixels;
         findNonZero(regionMask, pixels);
 
+        // Prepare the pixel coordinates for K-means clustering.
         Mat data((int)pixels.size(), 2, CV_32F);
         for (size_t p = 0; p < pixels.size(); p++)
         {
@@ -192,6 +246,7 @@ vector<Point2f> findBallCentres(const vector<vector<Point>>& ballContours,
             data.at<float>((int)p, 1) = (float)pixels[p].y / VERTICAL_STRETCH;
         }
 
+        // Separate touching balls into clusters and calculate their centres.
         Mat labels, clusterCentres;
         theRNG().state = 12345;
         kmeans(data, numBalls, labels,
@@ -227,8 +282,10 @@ struct BallDescription
     double whiteFraction = 0.0;
 };
 
+// Extracts colour features from a detected ball for recognition.
 BallDescription describeBall(const Mat& hls, const Mat& feltMask, Point2f centre)
 {
+    // Create an elliptical region around the ball and exclude the table felt.
     Mat region = Mat::zeros(hls.size(), CV_8UC1);
     ellipse(region, Point(cvRound(centre.x), cvRound(centre.y)), Size(20, 30),
             0, 0, 360, Scalar(255), FILLED);
@@ -238,6 +295,7 @@ BallDescription describeBall(const Mat& hls, const Mat& feltMask, Point2f centre
 
     BallDescription d;
 
+    // Calculate and normalise the HLS colour histogram of the ball.
     int channels[] = { 0, 1, 2 };
     int histSize[] = { 12, 4, 4 };
     float hueRange[] = { 0, 180 };
@@ -246,6 +304,7 @@ BallDescription describeBall(const Mat& hls, const Mat& feltMask, Point2f centre
     calcHist(&hls, 1, channels, region, d.histogram, 3, histSize, ranges);
     normalize(d.histogram, d.histogram, 1.0, 0.0, NORM_L1);
 
+    // Calculate the fraction of pixels that are bright enough to be considered white.
     Mat lightness;
     extractChannel(hls, lightness, 1);
     Mat whitePixels = (lightness > WHITE_LIGHTNESS) & region;
@@ -263,19 +322,24 @@ struct BallModel
 
 string ballName(int index);
 
-BallModel trainBallModel(const Mat& allBallsImage){
+BallModel trainBallModel(const Mat& allBallsImage)
+{
     BallModel model;
-    Mat image = transformImage(allBallsImage);    
+
+    // Transform the training image and convert it to HLS colour space.
+    Mat image = transformImage(allBallsImage);
     Mat hls;
     cvtColor(image, hls, COLOR_BGR2HLS);
     Mat feltMask = createGreenMask(image);
 
+    // Extract a colour description for each of the 16 reference balls.
     for (int b = 0; b < 16; b++)
     {
         Point2f centre((float)ALLBALLS_GT[b][1], (float)ALLBALLS_GT[b][0]);
         model.reference.push_back(describeBall(hls, feltMask, centre));
     }
 
+    // Find the white-fraction ranges for solid and striped balls.
     double maxSolid = 0.0, minStripe = 1.0;
     for (int b = 0; b < 8; b++)
     {
@@ -285,6 +349,8 @@ BallModel trainBallModel(const Mat& allBallsImage){
     {
         minStripe = min(minStripe, model.reference[b].whiteFraction);
     }
+
+    // Calculate a threshold to help distinguish solid and striped balls.
     model.stripeThreshold = sqrt(maxSolid * minStripe);
 
     cout << "Stripe threshold (from AllBalls): " << model.stripeThreshold << endl;
@@ -296,17 +362,22 @@ BallModel trainBallModel(const Mat& allBallsImage){
         putText(display, ballName(b), Point(centre.x - 10, centre.y - 38),
                 FONT_HERSHEY_SIMPLEX, 0.7, Scalar(255, 255, 255), 2);
     }
+
+    // Save the reference image with the ball labels drawn on it.
     imwrite("results/AllBalls_references.jpeg", display);
     return model;
 }
 
 double labelCost(const BallDescription& ball, int b, const BallModel& model)
 {
+    // Compare the detected ball's histogram with the selected reference ball.
     double cost = compareHist(ball.histogram, model.reference[b].histogram,
                               HISTCMP_BHATTACHARYYA);
 
+    // Check whether the detected ball looks white or striped.
     bool looksWhite = ball.whiteFraction > WHITE_BALL_FRACTION;
     bool looksStripe = ball.whiteFraction > model.stripeThreshold;
+
     if (b == 15)
     {
         if (!looksWhite) cost += APPEARANCE_PENALTY;
@@ -316,12 +387,15 @@ double labelCost(const BallDescription& ball, int b, const BallModel& model)
         if (looksWhite) cost += APPEARANCE_PENALTY;
         if (looksStripe != (b >= 8)) cost += APPEARANCE_PENALTY;
     }
+
     return cost;
 }
 
 vector<int> assignBallLabels(const vector<BallDescription>& balls, const BallModel& model)
 {
     vector<tuple<double, int, int>> options;
+
+    // Calculate the matching cost between every detected ball and each reference ball.
     for (size_t i = 0; i < balls.size(); i++)
     {
         for (int b = 0; b < 16; b++)
@@ -329,20 +403,26 @@ vector<int> assignBallLabels(const vector<BallDescription>& balls, const BallMod
             options.push_back(make_tuple(labelCost(balls[i], b, model), (int)i, b));
         }
     }
+
+    // Sort all possible matches from lowest cost to highest cost.
     sort(options.begin(), options.end());
 
     vector<int> labels(balls.size(), -1);
     vector<bool> numberUsed(16, false);
+
+    // Assign the best available label to each detected ball, without reusing a number.
     for (size_t o = 0; o < options.size(); o++)
     {
         int i = get<1>(options[o]);
         int b = get<2>(options[o]);
+
         if (labels[i] == -1 && !numberUsed[b])
         {
             labels[i] = b;
             numberUsed[b] = true;
         }
     }
+
     return labels;
 }
 
@@ -376,10 +456,13 @@ DetectionScore evaluateDetection(const vector<Point2f>& detections, int tableInd
 {
     vector<Point2f> truth;
     vector<int> truthId;
+
+    // Collect the ground-truth ball positions for the selected table.
     for (int b = 0; b < 16; b++)
     {
         int row = GROUND_TRUTH[tableIndex][b][0];
         int col = GROUND_TRUTH[tableIndex][b][1];
+
         if (row >= 0)
         {
             truth.push_back(Point2f((float)col, (float)row));
@@ -387,7 +470,7 @@ DetectionScore evaluateDetection(const vector<Point2f>& detections, int tableInd
         }
     }
 
-    // Every possible (detection, truth) pair, sorted by distance
+    // Generate all possible detection-to-ground-truth pairs and calculate their distances.
     vector<tuple<double, int, int>> pairs;
     for (size_t d = 0; d < detections.size(); d++)
     {
@@ -396,12 +479,15 @@ DetectionScore evaluateDetection(const vector<Point2f>& detections, int tableInd
             pairs.push_back(make_tuple(norm(detections[d] - truth[g]), (int)d, (int)g));
         }
     }
+
+    // Sort the pairs so that the closest matches are considered first.
     sort(pairs.begin(), pairs.end());
 
     vector<bool> detectionUsed(detections.size(), false);
     vector<bool> truthUsed(truth.size(), false);
     DetectionScore score;
 
+    // Match detections to ground truth, allowing each position to be used only once.
     for (size_t p = 0; p < pairs.size(); p++)
     {
         double distance = get<0>(pairs[p]);
@@ -424,19 +510,23 @@ DetectionScore evaluateDetection(const vector<Point2f>& detections, int tableInd
         score.matches.push_back(make_pair(d, truthId[g]));
     }
 
+    // Count detections that did not match and ground-truth balls that were missed.
     score.falsePositives = (int)detections.size() - score.truePositives;
     score.falseNegatives = (int)truth.size() - score.truePositives;
+
     return score;
 }
 
  
 void printScore(const string& label, const DetectionScore& s)
 {
+    // Calculate the detection performance metrics.
     double precision = s.truePositives / (double)(s.truePositives + s.falsePositives);
     double recall = s.truePositives / (double)(s.truePositives + s.falseNegatives);
     double f1 = 2 * precision * recall / (precision + recall);
     double meanError = s.truePositives > 0 ? s.totalError / s.truePositives : 0.0;
- 
+
+    // Display the results for the current table or overall evaluation.
     cout << label << "  TP=" << s.truePositives << " FP=" << s.falsePositives
          << " FN=" << s.falseNegatives << fixed << setprecision(3)
          << "  Precision=" << precision << " Recall=" << recall
