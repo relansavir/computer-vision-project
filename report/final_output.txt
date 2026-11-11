@@ -1,0 +1,135 @@
+Felt hue 61, saturation 48, lightness 100, Otsu threshold 62
+Stripe threshold (from AllBalls): 0.244823
+
+Table1.jpeg
+Felt hue 63, saturation 49, lightness 105, Otsu threshold 63
+Table 1  TP=13 FP=0 FN=3  Precision=1.000 Recall=0.812 F1=0.897  Mean error=9.7 mm
+  Ball W: column 28, row 283
+  Ball 1: column 1208, row 235
+  Ball 7: column 1161, row 327
+  Ball 4: column 1048, row 343
+  Ball 13: column 1209, row 362
+  Ball 15: column 1208, row 297
+  Ball 2: column 1207, row 427
+  Ball 8: column 1077, row 294
+  Ball 14: column 1094, row 358
+  Ball 9: column 1120, row 283
+  Ball 6: column 1160, row 250
+  Ball 3: column 1128, row 382
+  Ball 11: column 1167, row 404
+
+Table2.jpeg
+Felt hue 62, saturation 48, lightness 104, Otsu threshold 65
+Table 2  TP=16 FP=0 FN=0  Precision=1.000 Recall=1.000 F1=1.000  Mean error=4.3 mm
+  Ball 11: column 793, row 655
+  Ball 2: column 1225, row 618
+  Ball W: column 1170, row 503
+  Ball 5: column 1305, row 307
+  Ball 12: column 438, row 294
+  Ball 14: column 1089, row 362
+  Ball 7: column 1171, row 360
+  Ball 8: column 1129, row 330
+  Ball 4: column 1051, row 316
+  Ball 1: column 1103, row 280
+  Ball 15: column 1204, row 394
+  Ball 3: column 1122, row 396
+  Ball 6: column 626, row 221
+  Ball 10: column 1269, row 182
+  Ball 9: column 723, row 175
+  Ball 13: column 1233, row 51
+
+Table3.jpeg
+Felt hue 64, saturation 49, lightness 100, Otsu threshold 67
+Table 3  TP=15 FP=0 FN=1  Precision=1.000 Recall=0.938 F1=0.968  Mean error=4.8 mm
+  Ball 11: column 793, row 654
+  Ball 2: column 1224, row 617
+  Ball W: column 31, row 431
+  Ball 15: column 1206, row 393
+  Ball 3: column 1198, row 448
+  Ball 4: column 31, row 336
+  Ball 5: column 1405, row 301
+  Ball 7: column 1293, row 256
+  Ball 12: column 352, row 245
+  Ball 6: column 626, row 222
+  Ball 10: column 1275, row 171
+  Ball 8: column 1251, row 224
+  Ball 9: column 723, row 175
+  Ball 13: column 1233, row 52
+  Ball 1: column 905, row 31
+
+Table4.jpeg
+Felt hue 64, saturation 49, lightness 99, Otsu threshold 66
+Table 4  TP=14 FP=1 FN=1  Precision=0.933 Recall=0.933 F1=0.933  Mean error=6.7 mm
+  Ball 11: column 793, row 656
+  Ball 2: column 1406, row 546
+  Ball 3: column 1198, row 448
+  Ball 15: column 1206, row 393
+  Ball 5: column 1406, row 302
+  Ball 12: column 351, row 244
+  Ball 6: column 626, row 220
+  Ball 8: column 1249, row 227
+  Ball 7: column 1288, row 248
+  Ball 10: column 1275, row 171
+  Ball 9: column 722, row 174
+  Ball 13: column 1233, row 51
+  Ball 4: column 1409, row 36
+  Ball W: column 1385, row 91
+  Ball 1: column 904, row 31
+
+Table5.jpeg
+Felt hue 64, saturation 49, lightness 100, Otsu threshold 62
+Table 5  TP=12 FP=1 FN=2  Precision=0.923 Recall=0.857 F1=0.889  Mean error=8.8 mm
+  Ball 11: column 790, row 645
+  Ball 2: column 1405, row 544
+  Ball 9: column 74, row 540
+  Ball 1: column 22, row 542
+  Ball 14: column 42, row 610
+  Ball 6: column 65, row 489
+  Ball 15: column 1205, row 390
+  Ball 3: column 1197, row 446
+  Ball 5: column 1405, row 299
+  Ball 12: column 348, row 240
+  Ball 7: column 1287, row 246
+  Ball 8: column 1248, row 223
+  Ball 10: column 1274, row 168
+
+Table6.jpeg
+Felt hue 64, saturation 48, lightness 100, Otsu threshold 61
+Table 6  TP=11 FP=3 FN=2  Precision=0.786 Recall=0.846 F1=0.815  Mean error=6.3 mm
+  Ball 14: column 491, row 631
+  Ball 4: column 167, row 630
+  Ball W: column 944, row 628
+  Ball 1: column 26, row 534
+  Ball 9: column 77, row 537
+  Ball 6: column 71, row 483
+  Ball 2: column 1361, row 475
+  Ball 3: column 1197, row 446
+  Ball 15: column 1205, row 390
+  Ball 5: column 1405, row 299
+  Ball 12: column 348, row 240
+  Ball 10: column 1274, row 168
+  Ball 8: column 1249, row 223
+  Ball 7: column 1288, row 246
+OVERALL  TP=81 FP=5 FN=9  Precision=0.942 Recall=0.900 F1=0.920  Mean error=6.6 mm
+
+RECOGNITION  correct=75 of 81 detected balls  accuracy=0.926
+END-TO-END  correct=75 of 90 balls  accuracy=0.833
+
+Confusion matrix (rows = true ball, columns = predicted)
+      1  2  3  4  5  6  7  8  9 10 11 12 13 14 15  W
+  1   5  0  0  0  0  0  0  1  0  0  0  0  0  0  0  0
+  2   0  6  0  0  0  0  0  0  0  0  0  0  0  0  0  0
+  3   0  0  6  0  0  0  0  0  0  0  0  0  0  0  0  0
+  4   0  0  0  3  0  0  0  0  0  0  0  0  0  0  0  0
+  5   0  0  0  0  5  0  0  0  0  0  0  0  0  0  1  0
+  6   0  0  0  0  0  4  0  0  0  0  0  0  0  0  0  0
+  7   0  0  0  0  0  0  5  0  0  0  0  0  0  0  0  0
+  8   0  0  0  0  0  0  0  5  0  0  0  0  0  0  0  0
+  9   1  0  0  0  0  0  0  0  5  0  0  0  0  0  0  0
+ 10   0  0  0  0  0  0  1  0  0  5  0  0  0  0  0  0
+ 11   0  0  0  0  0  0  0  0  0  0  5  0  0  0  0  0
+ 12   0  0  0  0  0  0  0  0  1  0  0  5  0  0  0  0
+ 13   0  0  0  0  0  0  0  0  0  0  0  0  4  0  0  0
+ 14   0  0  0  0  0  0  0  0  0  0  0  0  0  2  0  0
+ 15   0  0  0  0  0  0  0  0  0  0  0  0  0  0  5  0
+  W   0  0  0  0  0  0  0  0  0  0  0  0  0  1  0  5
