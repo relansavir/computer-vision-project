@@ -86,10 +86,8 @@ Mat createGreenMask(const Mat& image)
 
     Mat greenMask;
     double otsuThreshold = threshold(distance, greenMask, 0, 255, THRESH_BINARY_INV | THRESH_OTSU);
-
-
     cout << "Felt hue " << feltHue << ", saturation " << feltSat<< ", lightness " << feltLight << ", Otsu threshold " << (int)otsuThreshold << endl;
-
+    greenMask.setTo(0, lightness < 25);
     return greenMask;
 }
 
@@ -222,6 +220,7 @@ const int WHITE_LIGHTNESS = 160;
 const double WHITE_BALL_FRACTION = 0.88;
 const double APPEARANCE_PENALTY = 0.3;
 
+
 struct BallDescription
 {
     Mat histogram;
@@ -262,10 +261,9 @@ struct BallModel
     double stripeThreshold = 0.0;
 };
 
-BallModel trainBallModel()
-{
+BallModel trainBallModel(const Mat& allBallsImage){
     BallModel model;
-    Mat image = transformImage(imread("data/AllBalls.jpeg"));
+    Mat image = transformImage(allBallsImage);    
     Mat hls;
     cvtColor(image, hls, COLOR_BGR2HLS);
     Mat feltMask = createGreenMask(image);
@@ -437,59 +435,72 @@ void printScore(const string& label, const DetectionScore& s)
 }
 
 void MyApplication()
-{   
-    BallModel model = trainBallModel();
-    int confusion[16][16] = { 0 };   // [true ball][predicted ball]
+{
+    const char* file_location = "data/";
+    const char* pool_files[] = {
+        "AllBalls.jpeg",
+        "Table1.jpeg",
+        "Table2.jpeg",
+        "Table3.jpeg",
+        "Table4.jpeg",
+        "Table5.jpeg",
+        "Table6.jpeg"
+    };
+
+    int number_of_images = sizeof(pool_files) / sizeof(pool_files[0]);
+    Mat* pool_image = new Mat[number_of_images];
+    for (int file_no = 0; file_no < number_of_images; file_no++)
+    {
+        string filename(file_location);
+        filename.append(pool_files[file_no]);
+        pool_image[file_no] = imread(filename);
+        if (pool_image[file_no].empty())
+        {
+            cout << "Could not open " << filename << endl;
+            delete[] pool_image;
+            return;
+        }
+    }
+
+    BallModel model = trainBallModel(pool_image[0]);
+
+    int confusion[16][16] = { 0 };
     int unlabelled = 0;
     DetectionScore total;
-    for (int t = 1; t <= 6; t++)
+
+    for (int file_no = 1; file_no < number_of_images; file_no++)
     {
-    string filename = "data/Table" + to_string(t) + ".jpeg";
-    Mat original = imread(filename);
-    if (original.empty())
-    {
-        cout << "Could not load " << filename << endl;
-        continue;
-    }
-    Mat image = transformImage(original);
-    cout << "Table " << t << ":" << endl;
-    Mat greenMask = createGreenMask(image);
-    Mat cushionMask = createCushionMask(image);
-    Mat backgroundMask;
-    bitwise_or(greenMask, cushionMask, backgroundMask);
+        int table = file_no;
+        cout << "\n" << pool_files[file_no] << endl;
 
-    vector<vector<Point>> ballContours = findBallContours(backgroundMask);
-    cout << "Regions found: " << ballContours.size() << endl;
-    Mat result = image.clone();
-    drawContours(result, ballContours, -1, Scalar(0, 0, 255), 3);
-    vector<Point2f> ballCentres = findBallCentres(ballContours, image.size());
-    DetectionScore score = evaluateDetection(ballCentres, t - 1);
-    printScore("Table " + to_string(t), score);
+        Mat image = transformImage(pool_image[file_no]);
 
-    total.truePositives += score.truePositives;
-    total.falsePositives += score.falsePositives;
-    total.falseNegatives += score.falseNegatives;
-    total.totalError += score.totalError;
+        Mat greenMask = createGreenMask(image);
+        Mat cushionMask = createCushionMask(image);
+        Mat backgroundMask;
+        bitwise_or(greenMask, cushionMask, backgroundMask);
 
-            // Recognise each detected ball
-    Mat hls;
-    cvtColor(image, hls, COLOR_BGR2HLS);
-    vector<BallDescription> balls;
-    for (size_t i = 0; i < ballCentres.size(); i++)
-    {
-        balls.push_back(describeBall(hls, greenMask, ballCentres[i]));
-    }
-    vector<int> labels = assignBallLabels(balls, model);
+        vector<vector<Point>> ballContours = findBallContours(backgroundMask);
+        vector<Point2f> ballCentres = findBallCentres(ballContours, image.size());
 
-    for (size_t i = 0; i < ballCentres.size(); i++)
-    {
-        putText(result, ballName(labels[i]),
-                Point((int)ballCentres[i].x + 15, (int)ballCentres[i].y - 15),
-                FONT_HERSHEY_SIMPLEX, 0.9, Scalar(255, 255, 255), 2);
-    }
+        DetectionScore score = evaluateDetection(ballCentres, table - 1);
+        printScore("Table " + to_string(table), score);
+        total.truePositives += score.truePositives;
+        total.falsePositives += score.falsePositives;
+        total.falseNegatives += score.falseNegatives;
+        total.totalError += score.totalError;
 
-        // Compare with the true identity of every correctly detected ball
-    for (size_t m = 0; m < score.matches.size(); m++){
+        Mat hls;
+        cvtColor(image, hls, COLOR_BGR2HLS);
+        vector<BallDescription> balls;
+        for (size_t i = 0; i < ballCentres.size(); i++)
+        {
+            balls.push_back(describeBall(hls, greenMask, ballCentres[i]));
+        }
+        vector<int> labels = assignBallLabels(balls, model);
+
+        for (size_t m = 0; m < score.matches.size(); m++)
+        {
             int trueBall = score.matches[m].second;
             int predicted = labels[score.matches[m].first];
             if (predicted < 0)
@@ -498,25 +509,32 @@ void MyApplication()
                 continue;
             }
             confusion[trueBall][predicted]++;
-    }
-    
-    cout << "Balls found: " << ballCentres.size() << endl;
+        }
 
-    for (size_t i = 0; i < ballCentres.size(); i++)
-    {
-        drawMarker(result, ballCentres[i], Scalar(255, 0, 0),
-                   MARKER_CROSS, 30, 3);
-        cout << "  Ball " << i + 1 << ": column " << (int)ballCentres[i].x
-             << ", row " << (int)ballCentres[i].y << endl;
+        Mat result = image.clone();
+        drawContours(result, ballContours, -1, Scalar(0, 0, 255), 3);
+        for (size_t i = 0; i < ballCentres.size(); i++)
+        {
+            drawMarker(result, ballCentres[i], Scalar(255, 0, 0), MARKER_CROSS, 30, 3);
+            putText(result, ballName(labels[i]),
+                    Point((int)ballCentres[i].x + 15, (int)ballCentres[i].y - 15),
+                    FONT_HERSHEY_SIMPLEX, 0.9, Scalar(255, 255, 255), 2);
+            cout << "  Ball " << ballName(labels[i]) << ": column "
+                 << (int)ballCentres[i].x << ", row " << (int)ballCentres[i].y << endl;
+        }
+
+        string prefix = "results/detection/Table" + to_string(table);
+        imwrite(prefix + "_1_transformed.jpeg", image);
+        imwrite(prefix + "_2_background_mask.png", backgroundMask);
+        imwrite(prefix + "_3_detections.jpeg", result);
+
+        imshow(pool_files[file_no], result);
+        waitKey(0);
+        destroyAllWindows();
     }
 
-    string prefix = "results/detection/Table" + to_string(t);
-    imwrite(prefix + "_1_transformed.jpeg", image);
-    imwrite(prefix + "_2_background_mask.png", backgroundMask);
-    imwrite(prefix + "_3_detections.jpeg", result);
-    }
     printScore("OVERALL", total);
-    // Recognition results
+
     int correct = 0, evaluated = unlabelled;
     for (int i = 0; i < 16; i++)
     {
@@ -526,20 +544,31 @@ void MyApplication()
         }
         correct += confusion[i][i];
     }
+    int totalBalls = total.truePositives + total.falseNegatives;
     cout << "\nRECOGNITION  correct=" << correct << " of " << evaluated
          << " detected balls  accuracy=" << fixed << setprecision(3)
          << correct / (double)evaluated << endl;
+    cout << "END-TO-END  correct=" << correct << " of " << totalBalls
+         << " balls  accuracy=" << correct / (double)totalBalls << endl;
     cout.unsetf(ios::fixed);
 
     cout << "\nConfusion matrix (rows = true ball, columns = predicted)\n    ";
-    for (int j = 0; j < 16; j++) cout << setw(3) << ballName(j);
+    for (int j = 0; j < 16; j++)
+    {
+        cout << setw(3) << ballName(j);
+    }
     cout << endl;
     for (int i = 0; i < 16; i++)
     {
         cout << setw(3) << ballName(i) << " ";
-        for (int j = 0; j < 16; j++) cout << setw(3) << confusion[i][j];
+        for (int j = 0; j < 16; j++)
+        {
+            cout << setw(3) << confusion[i][j];
+        }
         cout << endl;
     }
+
+    delete[] pool_image;
 }
 
 int main()
