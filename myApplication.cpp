@@ -261,6 +261,8 @@ struct BallModel
     double stripeThreshold = 0.0;
 };
 
+string ballName(int index);
+
 BallModel trainBallModel(const Mat& allBallsImage){
     BallModel model;
     Mat image = transformImage(allBallsImage);    
@@ -286,6 +288,15 @@ BallModel trainBallModel(const Mat& allBallsImage){
     model.stripeThreshold = sqrt(maxSolid * minStripe);
 
     cout << "Stripe threshold (from AllBalls): " << model.stripeThreshold << endl;
+    Mat display = image.clone();
+    for (int b = 0; b < 16; b++)
+    {
+        Point centre(ALLBALLS_GT[b][1], ALLBALLS_GT[b][0]);
+        ellipse(display, centre, Size(20, 30), 0, 0, 360, Scalar(0, 255, 255), 2);
+        putText(display, ballName(b), Point(centre.x - 10, centre.y - 38),
+                FONT_HERSHEY_SIMPLEX, 0.7, Scalar(255, 255, 255), 2);
+    }
+    imwrite("results/AllBalls_references.jpeg", display);
     return model;
 }
 
